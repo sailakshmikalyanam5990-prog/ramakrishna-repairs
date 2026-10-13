@@ -1,7 +1,8 @@
 
-   from flask import Flask, render_template_string, request, redirect, url_for, session
+from flask import Flask, render_template_string, request, redirect, url_for, session
 from datetime import datetime
 import urllib.parse
+import random
 
 app = Flask(__name__)
 app.secret_key = 'ramakrishna_secret_key_123'
@@ -12,6 +13,8 @@ OWNER_PHONE = "916303623983"
 
 # bookings format: {b_id: {type, name, phone, address, device, issue, time, status}}
 bookings = {}
+# Temporary OTP storage: {phone: otp}
+otp_storage = {}
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -46,6 +49,7 @@ HTML_TEMPLATE = """
 
         .alert { background: #dff0d8; color: #3c763d; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: center; }
         .error { background: #f2dede; color: #a94442; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: center; }
+        .otp-box { background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: center; font-weight: bold; }
         
         .booking-card { background: #fff; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         
@@ -65,49 +69,105 @@ HTML_TEMPLATE = """
         
         <!-- Navigation bar -->
         <div class="topnav">
-            <a href="/">🏠 హోమ్ (రైపేర్)</a>
+            <a href="/">🏠 హోమ్ (బుక్ చేయండి)</a>
             <a href="/call-booking">📞 కాల్ బుకింగ్</a>
-            <a href="/my-bookings">📦 నా బుకింగ్స్</a>
+            <a href="/my-orders">📦 నా ఆర్డర్స్ హిస్టరీ</a>
+            {% if session.get('customer_phone') %}
+                <a href="/customer-logout" style="background: #f2dede; color: #a94442;">లాగౌట్ ({{ session.get('customer_phone') }})</a>
+            {% else %}
+                <a href="/customer-login">🔐 లాగిన్</a>
+            {% endif %}
         </div>
 
         {% if role == 'customer' %}
             <h1>రామకృష్ణ ఎలక్ట్రానిక్ రిపేర్స్</h1>
-            <p style="text-align: center; color: #666;">అన్ని రకాల ఎలక్ట్రానిక్ రిపేర్ల కొరకు మీ వివరాలు నమోదు చేయండి.</p>
+            <p style="text-align: center; color: #666;">Flipkart లాగా మీ నంబర్ తో లాగిన్ అయి రిపేర్ అపాయింట్మెంట్ బుక్ చేసుకోండి.</p>
             
-            {% if success_id %}
-                <div class="alert">
-                    మీ రిపేర్ బుకింగ్ విజయవంతంగా నమోదయింది!<br>
-                    మీ రిఫరెన్స్ ఐడీ: <strong>{{ success_id }}</strong>
+            {% if not session.get('customer_phone') %}
+                <div class="error" style="background: #fcf8e3; color: #8a6d3b;">
+                    దయచేసి బుక్ చేయడానికి ముందు మీ ఫోన్ నంబర్‌తో లాగిన్ అవ్వండి! <br>
+                    <a href="/customer-login" class="btn-primary" style="margin-top: 10px;">నెంబర్ తో లాగిన్ అవ్వండి</a>
                 </div>
-                <a class="whatsapp-btn" href="https://wa.me/{{ owner_phone }}?text={{ wa_message }}" target="_blank">📲 ఓనర్ వాట్సాప్‌కి వివరాలు పంపండి (Click Here)</a>
-            {% endif %}
+            {% else %}
+                {% if success_id %}
+                    <div class="alert">
+                        మీ రిపేర్ అపాయింట్మెంట్ విజయవంతంగా బుక్ అయింది!<br>
+                        మీ ఆర్డర్ ఐడీ: <strong>{{ success_id }}</strong>
+                    </div>
+                    <a class="whatsapp-btn" href="https://wa.me/{{ owner_phone }}?text={{ wa_message }}" target="_blank">📲 ఓనర్ వాట్సాప్‌కి వివరాలు పంపండి (Click Here)</a>
+                {% endif %}
 
-            <form method="POST" action="/book">
-                <div class="form-group">
-                    <label>మీ పేరు:</label>
-                    <input type="text" name="name" required placeholder="మీ పూర్తి పేరు రాయండి">
-                </div>
-                <div class="form-group">
-                    <label>ఫోన్ నంబర్:</label>
-                    <input type="text" name="phone" required placeholder="10 అంకెల ఫోన్ నంబర్">
-                </div>
-                <div class="form-group">
-                    <label>చిరునామా (Address):</label>
-                    <textarea name="address" rows="3" required placeholder="మీ ఊరు / అడ్రస్ రాయండి"></textarea>
-                </div>
-                <div class="form-group">
-                    <label>ఏ పరికరం రిపేర్ చేయాలి? (టైప్ చేయండి)</label>
-                    <input type="text" name="device" required placeholder="ఉదా: AC, TV, Fridge, Washing Machine మొదలైనవి">
-                </div>
-                <div class="form-group">
-                    <label>సమస్య ఏమిటి?</label>
-                    <textarea name="issue" rows="2" required placeholder="సమస్య వివరాలు తెలపండి"></textarea>
-                </div>
-                <button type="submit">బుకింగ్ కన్ఫర్మ్ చేయండి</button>
-            </form>
+                <form method="POST" action="/book">
+                    <div class="form-group">
+                        <label>మీ పేరు:</label>
+                        <input type="text" name="name" required placeholder="మీ పూర్తి పేరు రాయండి">
+                    </div>
+                    <div class="form-group">
+                        <label>ఫోన్ నంబర్ (లాగిన్ నంబర్):</label>
+                        <input type="text" name="phone" value="{{ session.get('customer_phone') }}" readonly style="background: #eef5fb;">
+                    </div>
+                    <div class="form-group">
+                        <label>చిరునామా (Address):</label>
+                        <textarea name="address" rows="3" required placeholder="మీ ఊరు / అడ్రస్ రాయండి"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>ఏ పరికరం రిపేర్ చేయాలి? (టైప్ చేయండి)</label>
+                        <input type="text" name="device" required placeholder="ఉదా: AC, TV, Fridge, Washing Machine మొదలైనవి">
+                    </div>
+                    <div class="form-group">
+                        <label>సమస్య ఏమిటి?</label>
+                        <textarea name="issue" rows="2" required placeholder="సమస్య వివరాలు తెలపండి"></textarea>
+                    </div>
+                    <button type="submit">అపాయింట్మెంట్ ఆర్డర్ చేయండి</button>
+                </form>
+            {% endif %}
             
             <div class="footer-link">
                 <a href="/admin-login">🔒 ఓనర్ (Admin) లాగిన్ కోసం ఇక్కడ నొక్కండి</a>
+            </div>
+
+        {% elif role == 'customer_login' %}
+            <h2>📱 కస్టమర్ ఫోన్ నంబర్ లాగిన్ (Flipkart Style)</h2>
+            
+            {% if error %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="/customer-login">
+                <div class="form-group">
+                    <label>మీ 10 అంకెల ఫోన్ నంబర్:</label>
+                    <input type="text" name="phone" required placeholder="ఫోన్ నంబర్ ఎంటర్ చేయండి" maxlength="10">
+                </div>
+                <button type="submit">OTP పంపు (Get OTP)</button>
+            </form>
+
+            <div class="footer-link">
+                <a href="/">⬅️ హోమ్ పేజీకి వెళ్లండి</a>
+            </div>
+
+        {% elif role == 'verify_otp' %}
+            <h2>🔐 OTP వెరిఫికేషన్</h2>
+            
+            {% if otp_sent %}
+                <div class="otp-box">
+                    మీ సిమ్యులేటెడ్ OTP: {{ otp_sent }} (ఇది కింద ఎంటర్ చేయండి)
+                </div>
+            {% endif %}
+
+            {% if error %}
+                <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="/verify-otp">
+                <div class="form-group">
+                    <label>OTP ఎంటర్ చేయండి:</label>
+                    <input type="text" name="entered_otp" required placeholder="4 అంకెల OTP రాయండి" maxlength="4">
+                </div>
+                <button type="submit">వెరిఫై & లాగిన్ అవ్వండి</button>
+            </form>
+
+            <div class="footer-link">
+                <a href="/customer-login">⬅️ వెనుకకు వెళ్లండి</a>
             </div>
 
         {% elif role == 'call_booking' %}
@@ -129,7 +189,7 @@ HTML_TEMPLATE = """
                 </div>
                 <div class="form-group">
                     <label>ఫోన్ నంబర్:</label>
-                    <input type="text" name="phone" required placeholder="10 అంకెల ఫోన్ నంబర్">
+                    <input type="text" name="phone" value="{{ session.get('customer_phone', '') }}" required placeholder="10 అంకెల ఫోన్ నంబర్">
                 </div>
                 <div class="form-group">
                     <label>మీ ఊరు / అడ్రస్:</label>
@@ -142,25 +202,24 @@ HTML_TEMPLATE = """
                 <a href="/">⬅️ హోమ్ పేజీకి వెళ్లండి</a>
             </div>
 
-        {% elif role == 'my_bookings' %}
-            <h2>📦 నా బుకింగ్స్ & కాల్ రిక్వెస్ట్స్ ట్రాకింగ్</h2>
-            <p style="text-align: center; color: #666;">మీ స్టేటస్ చూసుకోవడానికి మీ ఫోన్ నంబర్ లేదా ఐడీ ఎంటర్ చేయండి</p>
+        {% elif role == 'my_orders' %}
+            <h2>📦 నా ఆర్డర్స్ & అపాయింట్మెంట్స్ హిస్టరీ</h2>
             
-            <form method="GET" action="/my-bookings" style="margin-bottom: 20px;">
-                <div class="form-group">
-                    <input type="text" name="search" value="{{ search_query }}" placeholder="ఫోన్ నంబర్ లేదా ఐడీ (ఉదా: RER123456 లేదా CALL12345)" required>
+            {% if not session.get('customer_phone') %}
+                <div class="error" style="background: #fcf8e3; color: #8a6d3b;">
+                    మీ ఆర్డర్ హిస్టరీ చూసుకోవడానికి దయచేసి లాగిన్ అవ్వండి! <br>
+                    <a href="/customer-login" class="btn-primary" style="margin-top: 10px;">లాగిన్ అవ్వండి</a>
                 </div>
-                <button type="submit">వెతకండి</button>
-            </form>
-
-            {% if searched %}
+            {% else %}
+                <p style="text-align: center; color: #666;">లాగిన్ అయిన నంబర్: <strong>{{ session.get('customer_phone') }}</strong></p>
+                
                 {% if not matched_bookings %}
-                    <p style="text-align: center; color: #777;">ఈ నంబర్ లేదా ఐడీతో ఎలాంటి వివరాలు కనుగొనబడలేదు.</p>
+                    <p style="text-align: center; color: #777; margin-top: 20px;">మీ నంబర్ తో ఎలాంటి బుకింగ్స్ / ఆర్డర్స్ లేవు.</p>
                 {% else %}
                     {% for b_id, data in matched_bookings.items() %}
                         <div class="booking-card">
-                            <p><strong>ఐడీ:</strong> {{ b_id }}</p>
-                            <p><strong>రకం:</strong> {% if data.type == 'call' %}📞 కాల్ బుకింగ్{% else %}🛠️ రిపేర్ బుకింగ్{% endif %}</p>
+                            <p><strong>ఆర్డర్ ఐడీ:</strong> {{ b_id }}</p>
+                            <p><strong>రకం:</strong> {% if data.type == 'call' %}📞 కాల్ బుకింగ్{% else %}🛠️ రిపేర్ అపాయింట్మెంట్ ఆర్డర్{% endif %}</p>
                             <p><strong>పేరు:</strong> {{ data.name }}</p>
                             <p><strong>ఫోన్:</strong> {{ data.phone }}</p>
                             <p><strong>అడ్రస్:</strong> {{ data.address }}</p>
@@ -180,7 +239,7 @@ HTML_TEMPLATE = """
                             </p>
                             
                             {% if data.status != 'Cancelled' %}
-                                <a href="/cancel-booking/{{ b_id }}" class="btn-danger" onclick="return confirm('మీరు నిజంగా దీన్ని క్యాన్సిల్ చేయాలనుకుంటున్నారా?');">క్యాన్సిల్ చేయండి</a>
+                                <a href="/cancel-booking/{{ b_id }}" class="btn-danger" onclick="return confirm('మీరు నిజంగా ఈ ఆర్డర్‌ని క్యాన్సిల్ చేయాలనుకుంటున్నారా?');">ఆర్డర్ క్యాన్సిల్ చేయండి</a>
                             {% endif %}
                         </div>
                     {% endfor %}
@@ -212,7 +271,7 @@ HTML_TEMPLATE = """
 
         {% elif role == 'admin' %}
             <h2>⚙️ ఓనర్ / అడ్మిన్ డాష్‌బోర్డ్</h2>
-            <p>కస్టమర్ల బుకింగ్స్ మరియు కాల్ రిక్వెస్ట్స్ వివరాలు:</p>
+            <p>కస్టమర్ల బుకింగ్స్ మరియు అపాయింట్మెంట్ ఆర్డర్స్ వివరాలు:</p>
             
             {% if not bookings %}
                 <p style="text-align: center; color: #777;">ప్రస్తుతం ఎలాంటి రిక్వెస్ట్లు లేవు.</p>
@@ -220,7 +279,7 @@ HTML_TEMPLATE = """
                 {% for b_id, data in bookings.items() %}
                     <div class="booking-card">
                         <p><strong>ఐడీ:</strong> {{ b_id }}</p>
-                        <p><strong>రకం:</strong> {% if data.type == 'call' %}📞 కాల్ బుకింగ్{% else %}🛠️ రిపేర్ బుకింగ్{% endif %}</p>
+                        <p><strong>రకం:</strong> {% if data.type == 'call' %}📞 కాల్ బుకింగ్{% else %}🛠️ రిపేర్ అపాయింట్మెంట్{% endif %}</p>
                         <p><strong>పేరు:</strong> {{ data.name }}</p>
                         <p><strong>ఫోన్:</strong> <a href="tel:{{ data.phone }}">{{ data.phone }}</a></p>
                         <p><strong>అడ్రస్:</strong> {{ data.address }}</p>
@@ -241,14 +300,14 @@ HTML_TEMPLATE = """
 
                         {% if data.status == 'Pending' %}
                             <a href="/admin-action/{{ b_id }}/accept" class="btn-primary">✅ యాక్సెప్ట్ చేయి</a>
-                            <a href="/admin-action/{{ b_id }}/reject" class="btn-danger">❌ క్యాన్సిల్ చేయి</a>
+                            <a href="/admin-action/{{ b_id }}/reject" class="btn-danger">❌ రిజెక్ట్ చేయి</a>
                         {% endif %}
                     </div>
                 {% endfor %}
             {% endif %}
             
             <div class="footer-link" style="margin-top: 20px;">
-                <a href="/logout">🚪 లాగౌట్ అయి కస్టమర్ పేజీకి వెళ్లండి</a>
+                <a href="/logout">🚪 లాగౌట్ అయి హోమ్ పేజీకి వెళ్లండి</a>
             </div>
         {% endif %}
     </div>
@@ -260,10 +319,47 @@ HTML_TEMPLATE = """
 def home():
     return render_template_string(HTML_TEMPLATE, role='customer', owner_phone=OWNER_PHONE)
 
+@app.route('/customer-login', methods=['GET', 'POST'])
+def customer_login():
+    error = None
+    if request.method == 'POST':
+        phone = request.form.get('phone', '').strip()
+        if len(phone) == 10 and phone.isdigit():
+            # Generate 4-digit OTP (Flipkart style simulation)
+            otp = str(random.randint(1000, 9999))
+            otp_storage[phone] = otp
+            session['temp_phone'] = phone
+            return render_template_string(HTML_TEMPLATE, role='verify_otp', otp_sent=otp)
+        else:
+            error = "దయచేసి సరైన 10 అంకెల ఫోన్ నంబర్ ఎంటర్ చేయండి!"
+    return render_template_string(HTML_TEMPLATE, role='customer_login', error=error)
+
+@app.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    entered_otp = request.form.get('entered_otp', '').strip()
+    phone = session.get('temp_phone')
+    
+    if phone and phone in otp_storage and otp_storage[phone] == entered_otp:
+        session['customer_phone'] = phone
+        session.pop('temp_phone', None)
+        return redirect(url_for('home'))
+    else:
+        error = "తప్పు OTP! దయచేసి మళ్లీ ప్రయత్నించండి."
+        otp = otp_storage.get(phone, "1234")
+        return render_template_string(HTML_TEMPLATE, role='verify_otp', otp_sent=otp, error=error)
+
+@app.route('/customer-logout')
+def customer_logout():
+    session.pop('customer_phone', None)
+    return redirect(url_for('home'))
+
 @app.route('/book', methods=['POST'])
 def book():
+    if not session.get('customer_phone'):
+        return redirect(url_for('customer_login'))
+        
     name = request.form.get('name')
-    phone = request.form.get('phone')
+    phone = session.get('customer_phone')
     address = request.form.get('address')
     device = request.form.get('device')
     issue = request.form.get('issue')
@@ -282,7 +378,7 @@ def book():
         'status': 'Pending'
     }
     
-    raw_msg = f"కొత్త రిపేర్ బుకింగ్ వచ్చింది!\n\nఐడీ: {b_id}\nపేరు: {name}\nఫోన్: {phone}\nఅడ్రస్: {address}\nపరికరం: {device}\nసమస్య: {issue}\nసమయం: {time_str}"
+    raw_msg = f"కొత్త రిపేర్ అపాయింట్మెంట్ ఆర్డర్ వచ్చింది!\n\nఆర్డర్ ఐడీ: {b_id}\nపేరు: {name}\nఫోన్: {phone}\nఅడ్రస్: {address}\nపరికరం: {device}\nసమస్య: {issue}\nసమయం: {time_str}"
     wa_message = urllib.parse.quote(raw_msg)
     
     return render_template_string(HTML_TEMPLATE, role='customer', owner_phone=OWNER_PHONE, success_id=b_id, wa_message=wa_message)
@@ -309,71 +405,4 @@ def call_booking():
         raw_msg = f"కొత్త కాల్ రిక్వెస్ట్ వచ్చింది!\n\nఐడీ: {b_id}\nపేరు: {name}\nఫోన్: {phone}\nఅడ్రస్: {address}\nసమయం: {time_str}"
         wa_message = urllib.parse.quote(raw_msg)
         
-        return render_template_string(HTML_TEMPLATE, role='call_booking', owner_phone=OWNER_PHONE, success_id=b_id, wa_message=wa_message)
-        
-    return render_template_string(HTML_TEMPLATE, role='call_booking', owner_phone=OWNER_PHONE)
-
-@app.route('/my-bookings')
-def my_bookings():
-    search_query = request.args.get('search', '').strip()
-    matched_bookings = {}
-    searched = False
-    
-    if search_query:
-        searched = True
-        for b_id, data in bookings.items():
-            if search_query.lower() in b_id.lower() or search_query in data['phone']:
-                matched_bookings[b_id] = data
-                
-    return render_template_string(HTML_TEMPLATE, role='my_bookings', searched=searched, search_query=search_query, matched_bookings=matched_bookings)
-
-@app.route('/cancel-booking/<b_id>')
-def cancel_booking(b_id):
-    if b_id in bookings:
-        bookings[b_id]['status'] = 'Cancelled'
-        return redirect(url_for('my_bookings', search=bookings[b_id]['phone']))
-    return redirect(url_for('home'))
-
-@app.route('/admin-login', methods=['GET', 'POST'])
-def admin_login():
-    error = None
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session['admin_logged'] = True
-            return redirect(url_for('admin_dashboard'))
-        else:
-            error = "తప్పు యూజర్ నేమ్ లేదా పాస్‌వర్డ్!"
-            
-    return render_template_string(HTML_TEMPLATE, role='login', error=error)
-
-@app.route('/admin')
-def admin_dashboard():
-    if not session.get('admin_logged'):
-        return redirect(url_for('admin_login'))
-        
-    return render_template_string(HTML_TEMPLATE, role='admin', bookings=bookings)
-
-@app.route('/admin-action/<b_id>/<action>')
-def admin_action(b_id, action):
-    if not session.get('admin_logged'):
-        return redirect(url_for('admin_login'))
-        
-    if b_id in bookings:
-        if action == 'accept':
-            bookings[b_id]['status'] = 'Accepted'
-        elif action == 'reject':
-            bookings[b_id]['status'] = 'Cancelled'
-            
-    return redirect(url_for('admin_dashboard'))
-
-@app.route('/logout')
-def logout():
-    session.pop('admin_logged', None)
-    return redirect(url_for('home'))
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-    
+        return render_template_string(HTML_TEMPLATE, role='call_booking', o
