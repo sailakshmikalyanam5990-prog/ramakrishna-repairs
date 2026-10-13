@@ -73,6 +73,7 @@ HTML_TEMPLATE = """
             </form>
             
             <div class="footer-link">
+                div class="footer-link">
                 <a href="/admin">🔒 ఓనర్ (Admin) లాగిన్ కోసం ఇక్కడ నొక్కండి</a>
             </div>
 
