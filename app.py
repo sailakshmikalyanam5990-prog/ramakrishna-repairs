@@ -72,8 +72,7 @@ HTML_TEMPLATE = """
                 <button type="submit">బుకింగ్ కన్ఫర్మ్ చేయండి</button>
             </form>
             
-            <div class="footer-link">
-                div class="footer-link">
+            div class="footer-link">
                 <a href="/admin">🔒 ఓనర్ (Admin) లాగిన్ కోసం ఇక్కడ నొక్కండి</a>
             </div>
 
