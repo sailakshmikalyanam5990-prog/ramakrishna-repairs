@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8">
+  <title>అడ్మిన్ లాగిన్ - రామకృష్ణ రిపేర్స్</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; margin: 0; }
+    .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 320px; }
+    h3 { text-align: center; color: #333; margin-bottom: 20px; }
+    input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    button { width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+    button:hover { background: #218838; }
+    #err { color: red; text-align: center; font-size: 14px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h3>అడ్మిన్ లాగిన్</h3>
+  <input type="text" id="user" placeholder="యూజర్ నేమ్">
+  <input type="password" id="pass" placeholder="పాస్‌వర్డ్">
+  <button onclick="checkLogin()">లాగిన్</button>
+  <p id="err"></p>
+</div>
+
+<script>
+  function checkLogin() {
+    // యూజర్ నేమ్ మరియు పాస్‌వర్డ్ ఇక్కడ సెట్ చేయబడ్డాయి
+    const correctUser = "ramakrishnarepairs"; 
+    const correctPass = "RamakrishnaRepairs@2026";
+
+    let u = document.getElementById("user").value;
+    let p = document.getElementById("pass").value;
+
+    if (u === correctUser && p === correctPass) {
+      // లాగిన్ సక్సెస్ అయితే బ్రౌజర్‌లో సేవ్ చేసి అడ్మిన్ డాష్‌బోర్డ్‌కి పంపుతుంది
+      sessionStorage.setItem("isAdminLoggedIn", "true");
+      window.location.href = "admin.html"; 
+    } else {
+      document.getElementById("err").innerText = "తప్పు యూజర్ నేమ్ లేదా పాస్‌వర్డ్!";
+    }
+  }
+</script>
+
+</body>
+</html>
