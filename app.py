@@ -8,7 +8,6 @@ from flask import Flask, request, jsonify, session, render_template_string
 app = Flask(__name__)
 app.secret_key = 'ramakrishna_secret'
 
-# --- DATABASE CONNECTION (Supabase Postgres) ---
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     if database_url and database_url.startswith('postgres://'):
@@ -16,7 +15,6 @@ def get_db_connection():
     conn = psycopg2.connect(database_url, sslmode='require')
     return conn
 
-# --- INITIALIZE & UPDATE TABLES ---
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -34,7 +32,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     ''')
-    # పాత టేబుల్ ఉంటే కొత్త కాలమ్స్ యాడ్ చేయడానికి
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS cancel_reason TEXT;")
     cur.execute("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
     conn.commit()
@@ -46,7 +43,6 @@ try:
 except Exception as e:
     print("Database Init Error:", e)
 
-# --- 1. CUSTOMER HTML & CSS ---
 CUSTOMER_HTML = """<!DOCTYPE html>
 <html>
 <head>
@@ -77,7 +73,6 @@ CUSTOMER_HTML = """<!DOCTYPE html>
         <a href="/admin" style="color:#fff; text-decoration:none; font-size:13px;">Admin Login</a>
     </div>
     <div class="container">
-        <!-- LOGIN SECTION -->
         <div id="login-sec" class="card">
             <h3>మొబైల్ లాగిన్ (WhatsApp OTP)</h3>
             <div class="form-group"><label>ఫోన్ నంబర్:</label><input type="text" id="login-phone" maxlength="10" placeholder="10 అంకెల నంబర్"></div>
@@ -89,7 +84,6 @@ CUSTOMER_HTML = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- CUSTOMER DASHBOARD -->
         <div id="dash-sec" class="hidden">
             <div class="card">
                 <h3>బుక్ అపాయింట్మెంట్</h3>
@@ -108,7 +102,6 @@ CUSTOMER_HTML = """<!DOCTYPE html>
                 <button onclick="bookAppointment()">బుక్ చేసుకోండి</button>
             </div>
 
-            <!-- AUTOMATIC ORDER HISTORY -->
             <div class="card">
                 <h3>మీ ఆర్డర్ హిస్టరీ (My Bookings)</h3>
                 <button class="btn-sec" onclick="loadMyOrders()" style="margin-bottom:10px; padding:6px; font-size:12px;">రిఫ్రెష్ చేయండి (Refresh)</button>
@@ -142,7 +135,7 @@ CUSTOMER_HTML = """<!DOCTYPE html>
                     document.getElementById('login-sec').classList.add('hidden');
                     document.getElementById('dash-sec').classList.remove('hidden');
                     document.getElementById('cust-phone').value = curPhone;
-                    loadMyOrders(); // లాగిన్ అవ్వగానే ఆర్డర్లు ఆటోమేటిక్ గా వస్తాయి
+                    loadMyOrders();
                 } else alert(res.message);
             });
         }
@@ -162,7 +155,7 @@ CUSTOMER_HTML = """<!DOCTYPE html>
                 if(res.success){
                     alert(res.message);
                     document.getElementById('booking-desc').value = "";
-                    loadMyOrders(); // కొత్త ఆర్డర్ వెంటనే లిస్ట్ లో కనిపిస్తుంది
+                    loadMyOrders();
                     if(confirm("WhatsApp లో అడ్మిన్ కి వివరాలు పంపాలా?")) window.open(res.whatsapp_url, '_blank');
                 } else alert(res.message);
             });
@@ -221,7 +214,6 @@ CUSTOMER_HTML = """<!DOCTYPE html>
 </html>
 """
 
-# --- 2. ADMIN HTML & CSS ---
 ADMIN_HTML = """<!DOCTYPE html>
 <html>
 <head>
@@ -285,7 +277,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                 if(res.success){
                     document.getElementById('adm-box').classList.add('hidden');
                     document.getElementById('adm-dash').classList.remove('hidden');
-                    loadAllOrders(); // లాగిన్ అవ్వగానే అన్ని ఆర్డర్లు ఆటోమేటిక్ గా వస్తాయి
+                    loadAllOrders();
                 } else alert(res.message);
             });
         }
@@ -363,7 +355,6 @@ ADMIN_HTML = """<!DOCTYPE html>
 </html>
 """
 
-# --- 3. BACKEND LOGIC WITH POSTGRES ---
 otp_storage = {}
 ADMIN_U = "ramakrishna-3947"
 ADMIN_P = "ramakrishna-sai lakshmi-6303"
@@ -388,7 +379,6 @@ def send_otp():
     otp = str(random.randint(1000, 9999))
     otp_storage[p] = otp
     
-    # కస్టమర్ నంబర్ కి WhatsApp లో OTP పంపే లింక్
     wa_msg = f"రామకృష్ణ ఎలక్ట్రానిక్స్ లాగిన్ OTP: *{otp}*. దయచేసి దీన్ని ఎవరికీ షేర్ చేయకండి."
     wa_otp_url = f"https://api.whatsapp.com/send?phone=91{p}&text={wa_msg}"
     return jsonify({'success': True, 'wa_otp_url': wa_otp_url})
@@ -416,4 +406,13 @@ def book_appointment():
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('''
-            INSERT INTO appointments (ref_number, type, nam
+            INSERT INTO appointments (ref_number, type, name, phone, village, pincode, description, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (info['ref_number'], info['type'], info['name'], info['phone'], info['village'], info['pincode'], info['description'], info['status']))
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        return jsonify({'success': False, 'message': 'డేటాబేస్ ఎర్రర్: ' + str(e)})
+
+    wa_text = f"కొత్త అపాయింట్‌మెంట్ బుక్ అయింది!%0Aటైప్: {info['type']}%0Aరిఫరెన్స్: {ref}%0Aపేరు: {info['name']}%0Aఫోన్: {info[
