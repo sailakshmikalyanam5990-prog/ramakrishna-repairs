@@ -415,4 +415,6 @@ def book_appointment():
     except Exception as e:
         return jsonify({'success': False, 'message': 'డేటాబేస్ ఎర్రర్: ' + str(e)})
 
-    wa_text = f"కొత్త అపాయింట్‌మెంట్ బుక్ అయింది!%0Aటైప్: {info['type']}%0Aరిఫరెన్స్: {ref}%0Aపేరు: {info['name']}%0Aఫోన్: {info[
+    # Fix: Multi-line string to prevent syntax error or truncation
+    wa_text = (
+        f"కొత్త అపాయింట్‌మెంట్ బుక్ అయింది!%0A
