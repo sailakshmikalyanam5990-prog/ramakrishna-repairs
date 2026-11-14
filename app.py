@@ -397,12 +397,16 @@ def book_appointment():
     data = request.json
     ref = gen_ref()
     info = {
-        'ref_number': ref, 'type': data.get('type'), 'name': data.get('name'),
-        'phone': data.get('phone'), 'village': data.get('village'),
-        'pincode': data.get('pincode') or 'N/A', 'description': data.get('description') or 'ఎలక్ట్రానిక్ సర్వీస్',
+        'ref_number': ref, 
+        'type': data.get('type'), 
+        'name': data.get('name'),
+        'phone': data.get('phone'), 
+        'village': data.get('village'),
+        'pincode': data.get('pincode') or 'N/A', 
+        'description': data.get('description') or 'ఎలక్ట్రానిక్ సర్వీస్',
         'status': 'బుక్ అయింది (Booked)'
     }
-        try:
+    try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('''
@@ -418,4 +422,6 @@ def book_appointment():
     wa_text = "New_Appointment_Booked_Ref_" + ref
     wa_url = "https://api.whatsapp.com/send?phone=" + ADMIN_WA + "&text=" + wa_text
     return jsonify({'success': True, 'ref_number': ref, 'whatsapp_url': wa_url, 'message': f'సక్సెస్! రిఫరెన్స్ నంబర్: {ref}'})
+    
+
 
