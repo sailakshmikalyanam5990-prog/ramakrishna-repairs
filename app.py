@@ -402,7 +402,7 @@ def book_appointment():
         'pincode': data.get('pincode') or 'N/A', 'description': data.get('description') or 'ఎలక్ట్రానిక్ సర్వీస్',
         'status': 'బుక్ అయింది (Booked)'
     }
-    try:
+        try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute('''
@@ -415,6 +415,7 @@ def book_appointment():
     except Exception as e:
         return jsonify({'success': False, 'message': 'డేటాబేస్ ఎర్రర్: ' + str(e)})
 
-    # Fix: Multi-line string to prevent syntax error or truncation
-    wa_text = (
-        f"కొత్త అపాయింట్‌మెంట్ బుక్ అయింది!%0A
+    wa_text = "New_Appointment_Booked_Ref_" + ref
+    wa_url = "https://api.whatsapp.com/send?phone=" + ADMIN_WA + "&text=" + wa_text
+    return jsonify({'success': True, 'ref_number': ref, 'whatsapp_url': wa_url, 'message': f'సక్సెస్! రిఫరెన్స్ నంబర్: {ref}'})
+
