@@ -420,8 +420,4 @@ def book_appointment():
         return jsonify({'success': False, 'message': 'డేటాబేస్ ఎర్రర్: ' + str(e)})
 
     wa_text = "New_Appointment_Booked_Ref_" + ref
-    wa_url = "https://api.whatsapp.com/send?phone=" + ADMIN_WA + "&text=" + wa_text
-    return jsonify({'success': True, 'ref_number': ref, 'whatsapp_url': wa_url, 'message': f'సక్సెస్! రిఫరెన్స్ నంబర్: {ref}'})
-    
-
-
+    wa_url = "https://api.whatsapp.com/send
